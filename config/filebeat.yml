@@ -1,0 +1,11 @@
+filebeat.modules:
+  - module: system
+    syslog:
+      var.paths: [ "/var/log/host/system.log*" ]
+  - module: mysql
+    slowlog:
+      var.paths: [ "/var/log/mysql/slow.log*" ]
+
+# Send logs to Elasticsearch
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]

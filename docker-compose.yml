@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: mysql
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./config/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
+      - ./data/mysql/logs:/var/log/mysql/
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    entrypoint: ""
+    command: bash -c "chown -R mysql:mysql /var/log/mysql && exec /entrypoint.sh mysqld"
+        
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.0
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - node.name=node1
+      - cluster.initial_master_nodes=node1
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms4096m -Xmx4096m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.4.0
+    container_name: filebeat
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./config/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - ./data/mysql/logs:/var/log/mysql/
+      - ./data/filebeat:/usr/share/filebeat/data/
+    command: filebeat -strict.perms=false
+        
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.4.0
+    container_name: kibana
+    environment:
+      - "ELASTICSEARCH_HOSTS=http://elasticsearch:9200"
+    ports:
+      - "5601:5601"
+        
+        
+#  Graylog doesn’t natively pull data directly from Elasticsearch.
+#  This typically requires a custom approach since Graylog mainly receives logs via its own input formats.
+#  graylog:
+#    image: graylog/graylog:4.2
+#    container_name: graylog
+#    environment:
+#      - GRAYLOG_PASSWORD_SECRET=myprojectsecretpassword
+#      - GRAYLOG_ROOT_PASSWORD_SHA2=967dc358aa21ab434b7161ba2e0183f236e535c2cc99bfdb0a1294ce31836623 # echo -n myprojectsecretpassword | sha256sum
+#      - GRAYLOG_HTTP_EXTERNAL_URI=http://127.0.0.1:9000/
+#      - GRAYLOG_ROOT_USERNAME=admin
+#    ports:
+#      - "9000:9000"  # Web interface
+#      - "12201:12201/udp" # GELF
+#        
+#  mongo: # Graylog relies on MongoDB to store its metadata
+#    image: mongo:3
+#    container_name: mongo_db
+#    ports:
+#      - '27017:27017'
